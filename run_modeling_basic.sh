@@ -2,77 +2,84 @@
 #
 # run_modeling_basic.sh (Shell Script)
 #
+# It's necessary Seismic Unix package to visualization
 # Necessita do pacote Seismic Unix instalado para visualização
 #
-# Objetivo: Basic acoustic wave equation modeling.
+# Main program: Basic acoustic wave equation modeling.
 #
-# Versão 2.0 (Modificada)
+# Versão 0.01
 #
-# Original: Felipe Timóteo 08/01/2019
+# author: Felipe Timóteo | felipetimoteo@id.uff.br
 #
-# Programador: Rodolfo A. C. Neves 14/01/2019
-# 
-# email: rodolfo_profissional@hotmail.com
+# updated by: Rodolfo A. C. Neves | rodolfo_profissional@hotmail.com
 # 
 # Licença: Software de uso livre e código aberto.
 
-#----------------{ Configuração de variáveis }-----------------------------#
-
+#--------------------------------------------------------------------------#
 # Versão deste programa
-VERSAO="Versão 2.0"
-
+VERSAO="Versão 0.01"
 #--------------------------------------------------------------------------#
 
 MENSAGEM_USO="
 $(basename $0) [-h | -v | -c | -e | -r ]
--h --help Exibe esta mensagem de ajuda e sai
--v --version Exibe a Versão do programa e sai
--c Compila os arquivos necessários deste programa em fortran 90
--e Executar programa de modelagem
--r Remover arquivos .bin 
-Exemplo de uso: 
-	bash$ $0 -c # Compilar arquivos .f90
-	bash$ $0 -e # Executar programa
-	bash$ $0 -r # Remover arquivos .bin
+-h --help    Show all instructions
+-v --version Show the version
+-c           Compiling the modeling program
+-e           Execute seimic modeling program
+-p           Visualize modeling and show seismogram
+-r           Clean files .bin 
+Usage: 
+	bash$ $0 -c # Compile files .f90
+	bash$ $0 -e # Execute program
+	bash$ $0 -r # Plot results
+	bash$ $0 -r # Clean files .bin
 "
-# Verificar se o usuário forneceu algum parâmetro
+# Check if user provide some parameter
 [ -z "$1" ] && {
-	echo "O usuário não forneceu nenhum parâmetro!" 
-	echo "Digite $0 -h para obter ajuda!" 
+	echo "The user doesn't provide any parameter" 
+	echo "Type $0 -h for more info" 
 	exit 1 
 }
 
 case "$1" in
--h | --help) ## Exibir ajuda
+-h | --help) ## Show help
 	echo -e "$MENSAGEM_USO"
 	exit 0
 ;;
 
--v | --version) ## Exibir versão
+-v | --version) ## Show version
 	echo "$VERSAO"
 	exit 0
 ;;
 
--c) ## Compilação
+-c) ## Compiling
 
-	# Compilação com arquivo Makefile
+	# Makefile compiling
 	make 
 
 	exit 0
 
 ;;
 
--e) ## Rodar modeling_basic
+-e) ## run main program
 
 	./modeling_basic
+	echo ""
+	echo "To visualize the results you'll need Seismic Unix package"
+	echo "Run $0 -p to plot the results"
+	echo ""
+	exit 0
 
-	# Visualizar (TODO:Basta descomentar)
+;;
+
+-p)
+	## Visualization
 	
 	#Snapshots
-	#xmovie n1=301 n2=301 sleep=1 loop=1 < snapshots.bin
+	xmovie n1=301 n2=301 sleep=1 loop=1 < snapshots.bin
 
 	#Seismogram
-	#ximage n1=1001 < seismogram.bin
+	ximage n1=1001 < seismogram.bin perc=99
 
 	exit 0
 ;;
@@ -84,9 +91,9 @@ case "$1" in
 	exit 0
 
 ;;
-*) ## Usuário forneceu parâmetro desconhecido
-	echo -e "\033[31mERRO: Opção $1 desconhecida!\033[m"
-	echo "\033[31mDigite $0 -h para obter ajuda\033[m"
+*) ## Message for bad parameter
+	echo -e "\033[31mERRO: Option $1 unknown!\033[m"
+	echo -e "\033[31mType $0 -h for help \033[m"
 	exit 3
 ;;
 esac
