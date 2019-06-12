@@ -1,3 +1,5 @@
+!! Instructions to compilation in gpu
+!pgfortran -acc modeling_basic.f90 -o run
 Program Modeling
 implicit none
 
@@ -7,7 +9,7 @@ integer :: Nx,Nz,Nt
 integer :: sx,sz
 integer :: Nt_src
 
-real :: h,dt
+real :: h,dt,starttime,endtime
 real :: fcut, fcut_aux
 real :: t_src,t0_src,src_aux
 real, parameter :: pi = 4.0*ATAN(1.0)
@@ -50,6 +52,8 @@ C = 1500
 fcut_aux       = fcut/(3.*sqrt(pi))        ! Ajust to cut of gaussian function
 t0_src   = 4*sqrt(pi)/fcut                 ! Initial time source
 Nt_src = nint(2*t0_src/dt) + 1           ! Number of elements of the source
+
+!$acc parallel loop private(k)
 do k=1,Nt_src                          !Nts=nint(tm/dt)+1
     t_src=(k-1)*dt-t0_src                    !Delay Time
     src_aux=pi*(pi*fcut_aux*t_src)*(pi*fcut_aux*t_src)
@@ -62,13 +66,17 @@ do k=1,Nt_src                          !Nts=nint(tm/dt)+1
 
  open(24, file='seismogram.bin', status='replace',&
  &FORM='unformatted',ACCESS='direct', recl=(Nx*Nt*4))
-
+ 
+ 
+ CALL cpu_time(starttime)
  ! Solve wave equation
 do k=1,Nt
 
     ! source term
     P2(sz,sx) = P2(sz,sx) + source(k)    
 
+    !$acc data copyin(P3,P2,P1,C) copyout(P3,P2,P1)
+    !$acc parallel loop private(i,j) 
     !wave equation
     do i=3,Nx-2
         do j=3,Nz-2                
@@ -87,17 +95,34 @@ do k=1,Nt
     end if
 
     ! update fields
-    P1=P2
-    P2=P3
-    
+    !  P1=P2
+    !  P2=P3
+
+    !$acc parallel loop private(i,j)
+    do i=3,Nx-2
+        do j=3,Nz-2                
+           P1(j,i)=P2(j,i)
+           P2(j,i)=P3(j,i) 
+        end do
+    end do
+    !$acc end data
+
+
     !Storage Seismogram
     Seism(k,:) = P2(3,:)
 
 end do
+CALL cpu_time(endtime)
+
 
 !Register Seismogram
 write(24,rec=1) ((Seism(k,i),k=1,Nt),i=1,Nx)
 
+
+
+write(*,*)""
+write(*,*)"processing time = ", endtime -  starttime
+write(*,*)""
 !close files
 close(23)
 close(24)
