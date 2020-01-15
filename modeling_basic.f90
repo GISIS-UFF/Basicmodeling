@@ -1,5 +1,3 @@
-!! Instructions to compilation in gpu
-!pgfortran -acc modeling_basic.f90 -o run
 Program Modeling
 implicit none
 
@@ -18,6 +16,7 @@ real,allocatable,dimension(:) :: source
 real,allocatable,dimension(:,:) :: P1,P2,P3,C
 real,allocatable,dimension(:,:) :: Seism
 
+CALL cpu_time(starttime)
 ! model parameters
 Nx=301
 Nz=301
@@ -53,30 +52,30 @@ fcut_aux       = fcut/(3.*sqrt(pi))        ! Ajust to cut of gaussian function
 t0_src   = 4*sqrt(pi)/fcut                 ! Initial time source
 Nt_src = nint(2*t0_src/dt) + 1           ! Number of elements of the source
 
-!$acc parallel loop private(k)
 do k=1,Nt_src                          !Nts=nint(tm/dt)+1
     t_src=(k-1)*dt-t0_src                    !Delay Time
     src_aux=pi*(pi*fcut_aux*t_src)*(pi*fcut_aux*t_src)
     source(k) = (2*src_aux-1)*exp(-src_aux)    
- end do
+end do
 
- ! Register in disk
- open(23, file='snapshots.bin', status='replace',&
- &FORM='unformatted',ACCESS='direct', recl=(Nx*Nz*4))
+! Register in disk
+open(23, file='snapshots.bin', status='replace',&
+&FORM='unformatted',ACCESS='direct', recl=(Nx*Nz*4))
 
- open(24, file='seismogram.bin', status='replace',&
- &FORM='unformatted',ACCESS='direct', recl=(Nx*Nt*4))
- 
- 
- CALL cpu_time(starttime)
- ! Solve wave equation
+open(24, file='seismogram.bin', status='replace',&
+&FORM='unformatted',ACCESS='direct', recl=(Nx*Nt*4))
+
+write(*,*)"Nx   = ", Nx
+write(*,*)"Nz   = ", Nz
+write(*,*)"dx   = ", h
+write(*,*)"Nt   = ", Nt
+write(*,*)"dt   = ", dt
+write(*,*)"fcut = ", fcut
+
+! Solve wave equation
 do k=1,Nt
-
     ! source term
     P2(sz,sx) = P2(sz,sx) + source(k)    
-
-    !$acc data copyin(P3,P2,P1,C) copyout(P3,P2,P1)
-    !$acc parallel loop private(i,j) 
     !wave equation
     do i=3,Nx-2
         do j=3,Nz-2                
@@ -89,41 +88,30 @@ do k=1,Nt
     end do
     
     !Register snapshots
-    if (mod(k,100) ==0) then
+    if (mod(k,100) ==0) then    
     write(23,rec=count_snap) ((P3(j,i),j=1,Nz),i=1,Nx)
     count_snap=count_snap+1
     end if
 
     ! update fields
-    !  P1=P2
-    !  P2=P3
-
-    !$acc parallel loop private(i,j)
-    do i=3,Nx-2
-        do j=3,Nz-2                
-           P1(j,i)=P2(j,i)
-           P2(j,i)=P3(j,i) 
-        end do
-    end do
-    !$acc end data
-
+     P1=P2
+     P2=P3
 
     !Storage Seismogram
     Seism(k,:) = P2(3,:)
 
 end do
-CALL cpu_time(endtime)
-
 
 !Register Seismogram
 write(24,rec=1) ((Seism(k,i),k=1,Nt),i=1,Nx)
 
-
-
-write(*,*)""
-write(*,*)"processing time = ", endtime -  starttime
-write(*,*)""
 !close files
 close(23)
 close(24)
+
+CALL cpu_time(endtime)
+write(*,*)""
+write(*,*)"processing time = ", endtime -  starttime
+write(*,*)""
+
 end program
